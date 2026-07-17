@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audit Results - {{ result.business_name }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://js.stripe.com/v3/"></script>
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        body { background: #f1f5f9; }
+        .report-header {
+            background: linear-gradient(135deg, #1e3a5f 0%, #2d6a9f 100%);
+            color: white;
+            padding: 50px 0 40px;
+        }
+        .report-header h1 { font-weight: 800; font-size: 2rem; }
+        .report-header .domain { opacity: 0.8; font-size: 1.1rem; }
+        .score-ring {
+            width: 120px; height: 120px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 2.2rem; font-weight: 800;
+            margin: 0 auto;
+            border: 6px solid;
+        }
+        .score-good { border-color: #22c55e; color: #22c55e; }
+        .score-mid { border-color: #eab308; color: #eab308; }
+        .score-bad { border-color: #ef4444; color: #ef4444; }
+
+        .issue-card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+            border-left: 5px solid;
+            transition: transform 0.15s;
+        }
+        .issue-card:hover { transform: translateX(4px); }
+        .issue-critical { border-left-color: #ef4444; }
+        .issue-high { border-left-color: #f97316; }
+        .issue-medium { border-left-color: #eab308; }
+        .issue-low { border-left-color: #94a3b8; }
+        .issue-card h5 { font-weight: 700; }
+        .issue-card .price-tag {
+            background: #dcfce7;
+            color: #166534;
+            font-weight: 700;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            white-space: nowrap;
+        }
+        .fix-btn {
+            border-radius: 10px;
+            font-weight: 600;
+            padding: 8px 20px;
+        }
+        .selected-item {
+            background: #f0fdf4;
+            border: 2px solid #22c55e;
+            border-radius: 12px;
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .selected-item .remove-btn { cursor: pointer; color: #ef4444; }
+        .summary-box {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            position: sticky;
+            top: 20px;
+        }
+        .pass-badge { color: #22c55e; }
+        .fail-badge { color: #ef4444; }
+        .social-found { color: #22c55e; font-weight: 600; }
+        .social-missing { color: #ef4444; font-weight: 600; }
+        .contact-form input { border-radius: 10px; padding: 12px; border: 2px solid #e2e8f0; }
+        .contact-form input:focus { border-color: #2d6a9f; box-shadow: 0 0 0 3px rgba(45,106,159,0.15); }
+    </style>
+</head>
+<body>
+    <div class="report-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1>Audit Report: {{ result.business_name }}</h1>
+                    <p class="domain mb-0">{{ result.url }}</p>
+                </div>
+                <div class="col-md-4 text-center">
+                    {% set score = 100 - (result.issue_count * 10) %}
+                    {% if score < 0 %}{% set score = 10 %}{% endif %}
+                    <div class="score-ring {% if score >= 70 %}score-good{% elif score >= 40 %}score-mid{% else %}score-bad{% endif %}">
+                        {{ score }}
+                    </div>
+                    <small class="text-white-50">Health Score</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container py-4">
+        <div class="row">
+            <!-- Issues Column -->
+            <div class="col-lg-8">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h3 class="fw-bold mb-0">
+                        <i class="bi bi-exclamation-triangle text-warning"></i>
+                        {{ result.issue_count }} Issues Found
+                    </h3>
+                    <span class="text-muted">Select items to fix &rarr;</span>
+                </div>
+
+                {% for issue in result.issues %}
+                <div class="issue-card issue-{{ issue.severity }}">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div style="flex:1">
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <span class="badge bg-{% if issue.severity == 'critical' %}danger{% elif issue.severity == 'high' %}warning{% elif issue.severity == 'medium' %}info{% else %}secondary{% endif %}">
+                                    {{ issue.severity|upper }}
+                                </span>
+                                <span class="price-tag">${{ issue.price }}</span>
+                                {% if issue.category == 'social' %}
+                                <span class="badge bg-primary bg-opacity-10 text-primary">Social</span>
+                                {% elif issue.category == 'seo' %}
+                                <span class="badge bg-success bg-opacity-10 text-success">SEO</span>
+                                {% elif issue.category == 'technical' %}
+                                <span class="badge bg-secondary bg-opacity-10 text-secondary">Technical</span>
+                                {% elif issue.category == 'reputation' %}
+                                <span class="badge bg-warning bg-opacity-10 text-warning">Reputation</span>
+                                {% elif issue.category == 'local' %}
+                                <span class="badge bg-info bg-opacity-10 text-info">Local</span>
+                                {% endif %}
+                            </div>
+                            <h5>{{ issue.title }}</h5>
+                            <p class="text-muted mb-2">{{ issue.detail }}</p>
+                            <p class="mb-0"><strong>Fix:</strong> {{ issue.fix }}</p>
+                        </div>
+                        <div class="ms-3">
+                            <input type="checkbox" class="form-check-input fix-checkbox"
+                                   data-id="{{ issue.id }}"
+                                   data-title="{{ issue.title }}"
+                                   data-fix="{{ issue.fix }}"
+                                   data-price="{{ issue.price }}"
+                                   style="width:24px;height:24px;cursor:pointer;">
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+
+                {% if result.issues|length == 0 %}
+                <div class="text-center py-5">
+                    <i class="bi bi-emoji-smile" style="font-size:4rem;color:#22c55e;"></i>
+                    <h4 class="mt-3 fw-bold">Great news!</h4>
+                    <p class="text-muted">We found no major issues with your online presence.</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Summary Sidebar -->
+            <div class="col-lg-4">
+                <div class="summary-box" id="summaryBox">
+                    <h4 class="fw-bold mb-3"><i class="bi bi-cart3"></i> Fix Summary</h4>
+                    <div id="selectedItems">
+                        <p class="text-muted small">Check items above to add them to your fix plan.</p>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between mb-3">
+                        <span class="fw-bold">Total:</span>
+                        <span class="fw-bold fs-5" id="totalPrice">$0</span>
+                    </div>
+
+                    <div class="contact-form">
+                        <div class="mb-2">
+                            <input type="email" class="form-control" id="customerEmail" placeholder="Your email *" required>
+                        </div>
+                        <div class="mb-3">
+                            <input type="tel" class="form-control" id="customerPhone" placeholder="Your phone number">
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary w-100 py-3 fw-bold" id="checkoutBtn" disabled style="border-radius:12px;font-size:1.05rem;">
+                        <i class="bi bi-lock-fill"></i> Proceed to Checkout
+                    </button>
+                    <p class="text-muted small text-center mt-2 mb-0">
+                        <i class="bi bi-shield-check"></i> Secure payment via Stripe
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const stripe = Stripe('{{ stripe_key }}');
+        const leadId = {{ lead_id }};
+        let selected = {};
+
+        document.querySelectorAll('.fix-checkbox').forEach(cb => {
+            cb.addEventListener('change', function() {
+                const id = this.dataset.id;
+                if (this.checked) {
+                    selected[id] = {
+                        id: id,
+                        title: this.dataset.title,
+                        fix: this.dataset.fix,
+                        price: parseFloat(this.dataset.price)
+                    };
+                } else {
+                    delete selected[id];
+                }
+                updateSummary();
+            });
+        });
+
+        function updateSummary() {
+            const container = document.getElementById('selectedItems');
+            const totalEl = document.getElementById('totalPrice');
+            const checkoutBtn = document.getElementById('checkoutBtn');
+
+            const items = Object.values(selected);
+
+            if (items.length === 0) {
+                container.innerHTML = '<p class="text-muted small">Check items above to add them to your fix plan.</p>';
+                totalEl.textContent = '$0';
+                checkoutBtn.disabled = true;
+                return;
+            }
+
+            let html = '';
+            let total = 0;
+            items.forEach(item => {
+                total += item.price;
+                html += `
+                    <div class="selected-item">
+                        <div>
+                            <strong>${item.title}</strong>
+                            <div class="small text-muted">${item.fix}</div>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <strong>$${item.price}</strong>
+                            <span class="remove-btn" onclick="removeItem('${item.id}')">&times;</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+            totalEl.textContent = '$' + total;
+            checkoutBtn.disabled = false;
+        }
+
+        function removeItem(id) {
+            const cb = document.querySelector(`.fix-checkbox[data-id="${id}"]`);
+            if (cb) {
+                cb.checked = false;
+                delete selected[id];
+                updateSummary();
+            }
+        }
+
+        document.getElementById('checkoutBtn').addEventListener('click', async function() {
+            const items = Object.values(selected);
+            if (items.length === 0) return;
+
+            const email = document.getElementById('customerEmail').value.trim();
+            if (!email) {
+                alert('Please enter your email address.');
+                return;
+            }
+
+            this.disabled = true;
+            this.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Processing...';
+
+            try {
+                const resp = await fetch('/create-checkout-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        lead_id: leadId,
+                        email: email,
+                        phone: document.getElementById('customerPhone').value.trim(),
+                        items: items
+                    })
+                });
+
+                const data = await resp.json();
+
+                if (data.url) {
+                    window.location.href = data.url;
+                } else if (data.session_id) {
+                    stripe.redirectToCheckout({ sessionId: data.session_id });
+                } else {
+                    alert('Error: ' + (data.error || 'Something went wrong'));
+                    this.disabled = false;
+                    this.innerHTML = '<i class="bi bi-lock-fill"></i> Proceed to Checkout';
+                }
+            } catch (e) {
+                alert('Connection error. Please try again.');
+                this.disabled = false;
+                this.innerHTML = '<i class="bi bi-lock-fill"></i> Proceed to Checkout';
+            }
+        });
+    </script>
+
+    <footer class="text-center py-4 text-muted small">
+        &copy; 2026 Web Audit Pro
+    </footer>
+</body>
+</html>
