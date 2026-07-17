@@ -288,6 +288,40 @@ def health():
     return jsonify({'status': 'ok', 'app': 'Web Audit Tool'})
 
 
+# ─── SEO ────────────────────────────────────────────────────────────────
+
+@app.route('/robots.txt')
+def robots_txt():
+    return """User-agent: *
+Allow: /
+Disallow: /admin
+Sitemap: https://web-audit-pro.onrender.com/sitemap.xml
+""", 200, {'Content-Type': 'text/plain'}
+
+
+@app.route('/sitemap.xml')
+def sitemap_xml():
+    from datetime import date
+    pages = [
+        '/', '/admin/login',
+    ]
+    today = date.today().isoformat()
+    urls = ''
+    for loc in pages:
+        urls += f"""  <url>
+    <loc>https://web-audit-pro.onrender.com{loc}</loc>
+    <lastmod>{today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+"""
+    xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+{urls}</urlset>
+"""
+    return xml, 200, {'Content-Type': 'application/xml'}
+
+
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=True)
