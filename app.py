@@ -5,6 +5,8 @@ Web Audit App - Scan websites for online presence gaps & sell fixes
 import os
 import sqlite3
 import json
+import smtplib
+from email.message import EmailMessage
 from datetime import datetime
 from functools import wraps
 
@@ -26,6 +28,49 @@ STRIPE_PUBLIC_KEY = os.getenv('STRIPE_PUBLIC_KEY', '')
 # Admin login
 ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
 ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'change-this-password')
+
+# Email notifications (Gmail SMTP)
+SMTP_EMAIL = 'sidehustlecristal@gmail.com'
+SMTP_PASSWORD='zmcw ifvo atjr vroo'
+NOTIFY_EMAIL = 'admin@dfyai.online'
+
+
+def send_notification(customer_email, items, total, business_url):
+    """Send email notification when a purchase is made."""
+    try:
+        msg = EmailMessage()
+        msg['Subject'] = f'💰 New Order - ${total} from {business_url}'
+        msg['From'] = SMTP_EMAIL
+        msg['To'] = NOTIFY_EMAIL
+
+        items_list = '\n'.join([f'  • {i}' for i in items])
+
+        body = f"""NEW CUSTOMER PAYMENT
+
+Website: {business_url}
+Customer Email: {customer_email}
+Total Paid: ${total}
+
+Items Purchased:
+{items_list}
+
+Action needed: Contact the customer within 24 hours to schedule their fixes.
+Log in to admin dashboard to see all details:
+https://web-audit-pro.onrender.com/admin
+"""
+        msg.set_content(body)
+
+        with smtplib.SMTP('smtp.gmail.com', 587) as server:
+            server.starttls()
+            server.login(SMTP_EMAIL, SMTP_PASSWORD)
+            server.send_message(msg)
+
+        print(f'Email notification sent for ${total} order')
+        return True
+    except Exception as e:
+        print(f'Email notification failed: {e}')
+        return False
+
 
 DB_PATH = os.path.join(os.path.dirname(__file__), 'leads.db')
 
@@ -201,6 +246,21 @@ def success():
         conn = get_db()
         conn.execute('UPDATE orders SET paid = 1 WHERE stripe_session_id = ?', (session_id,))
         conn.commit()
+
+        # Get order details for notification
+        order = conn.execute(
+            'SELECT o.*, l.url as business_url FROM orders o JOIN leads l ON o.lead_id = l.id WHERE o.stripe_session_id = ?',
+            (session_id,)
+        ).fetchone()
+
+        if order:
+            send_notification(
+                customer_email=order['customer_email'] or 'Not provided',
+                items=json.loads(order['items']),
+                total=order['total'],
+                business_url=order['business_url']
+            )
+
         conn.close()
 
     return render_template('success.html', lead_id=lead_id)
