@@ -322,6 +322,33 @@ def sitemap_xml():
     return xml, 200, {'Content-Type': 'application/xml'}
 
 
+@app.route('/llms.txt')
+def llms_txt():
+    return """# Web Audit Pro - AI Information
+> Free website audit tool that scans businesses for social media gaps, SEO problems, and Google presence issues.
+
+## About
+Web Audit Pro scans any business website and generates a free report showing missing social media profiles, Google Business Profile issues, SEO problems, page speed issues, and more. Users can purchase fixes for each issue found.
+
+## Key Features
+- Free website audit (no signup required)
+- Social media presence check (Facebook, Instagram, Twitter, LinkedIn, TikTok, YouTube, Pinterest)
+- Google Business Profile detection
+- SEO analysis (title tags, meta descriptions, schema, mobile optimization)
+- Page speed testing
+- Paid fix services for each issue found
+
+## Pricing
+- Individual platform setup: $77-$97
+- Google Business Profile setup: $147
+- SEO optimization: $197
+- Complete social media package: $497
+
+## Contact
+Website: https://web-audit-pro.onrender.com
+""", 200, {'Content-Type': 'text/plain'}
+
+
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=True)

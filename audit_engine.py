@@ -201,6 +201,13 @@ def check_seo_basics(soup, url):
     except:
         checks['has_sitemap'] = False
 
+    # Check llms.txt (AI search visibility)
+    try:
+        r = requests.get(f"{base}/llms.txt", timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
+        checks['has_llms_txt'] = r.status_code == 200
+    except:
+        checks['has_llms_txt'] = False
+
     return checks
 
 
@@ -414,6 +421,17 @@ def run_full_audit(url):
             'severity': 'medium',
             'fix': FIX_PRICING['schema']['fix'],
             'price': FIX_PRICING['schema']['price'],
+        })
+
+    if not seo.get('has_llms_txt', False):
+        issues.append({
+            'id': 'llms_txt',
+            'category': 'seo',
+            'title': 'Missing llms.txt (AI search visibility)',
+            'detail': 'An llms.txt file tells AI tools like ChatGPT, Claude, and Gemini how to represent your business. Without it, AI search may ignore or misrepresent your site.',
+            'severity': 'medium',
+            'fix': 'Create and configure llms.txt file for AI search optimization',
+            'price': 57,
         })
 
     if not ssl:
