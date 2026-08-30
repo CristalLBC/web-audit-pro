@@ -1,0 +1,1 @@
+This project allows one to enter a website, that is then evaluated by AI for social media accounts and engagement, as well as rated for AI search visibilty, search engine visibility, correct links, etc. It basically rates how much a website needs fixing, and then offers a way to fix the things that are wrong with site for a fee.
