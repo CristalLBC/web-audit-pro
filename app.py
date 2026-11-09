@@ -25,8 +25,15 @@ app.secret_key = os.getenv('SECRET_KEY', 'change-this-to-a-random-secret')
 # package does not attach `checkout`, so `stripe.checkout.Session.create(...)`
 # raises "'NoneType' object has no attribute 'Session'" without this line.
 import stripe.checkout
-stripe.api_key = os.getenv('STRIPE_SECRET_KEY', '')
-STRIPE_PUBLIC_KEY = os.getenv('STRIPE_PUBLIC_KEY', '')
+# Env values pasted into a dashboard often carry a leading newline or stray quotes.
+# Stripe sends the key as an HTTP header, so a single "\n" breaks every request with
+# "InvalidHeader ... Bearer \n rk_live_..." — strip it here, once.
+def _clean_env(name, default=''):
+    v = os.getenv(name, default) or ''
+    return v.strip().strip('"').strip("'").strip()
+
+stripe.api_key = _clean_env('STRIPE_SECRET_KEY')
+STRIPE_PUBLIC_KEY = _clean_env('STRIPE_PUBLIC_KEY')
 
 # PRICING MODE
 # None  -> charge the real fix prices from audit_engine (production)
