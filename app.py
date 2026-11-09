@@ -21,9 +21,17 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'change-this-to-a-random-secret')
 
-# Stripe
+# Stripe — the submodules must be imported explicitly. With stripe>=7 the root
+# package does not attach `checkout`, so `stripe.checkout.Session.create(...)`
+# raises "'NoneType' object has no attribute 'Session'" without this line.
+import stripe.checkout
 stripe.api_key = os.getenv('STRIPE_SECRET_KEY', '')
 STRIPE_PUBLIC_KEY = os.getenv('STRIPE_PUBLIC_KEY', '')
+
+# PRICING MODE
+# None  -> charge the real fix prices from audit_engine (production)
+# 1.00  -> every order charges exactly this amount, for live checkout testing
+TEST_PRICE_USD = 1.00
 
 # Admin login
 ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
@@ -141,6 +149,12 @@ def audit():
     except Exception as e:
         return render_template('index.html', error=f'Error scanning website: {str(e)}', stripe_key=STRIPE_PUBLIC_KEY)
 
+    # TEST PRICING: show every fix at the test price so the page matches the charge
+    if TEST_PRICE_USD is not None:
+        for issue in result.get('issues', []):
+            issue['price'] = TEST_PRICE_USD
+        result['total_fix_cost'] = round(TEST_PRICE_USD * len(result.get('issues', [])), 2)
+
     # Save lead to DB
     conn = get_db()
     cursor = conn.execute(
@@ -209,6 +223,22 @@ def create_checkout_session():
         item_names.append(item['title'])
 
     total = sum(item['price'] for item in items)
+
+    # TEST PRICING: one line item, exactly TEST_PRICE_USD, whatever was selected
+    if TEST_PRICE_USD is not None:
+        n = len(item_names)
+        line_items = [{
+            'price_data': {
+                'currency': 'usd',
+                'product_data': {
+                    'name': 'Website audit fix — test order' if n == 1 else f'Website audit fixes — test order ({n} items)',
+                    'description': 'Live checkout test. ' + ', '.join(item_names)[:400],
+                },
+                'unit_amount': int(round(TEST_PRICE_USD * 100)),
+            },
+            'quantity': 1,
+        }]
+        total = TEST_PRICE_USD
 
     try:
         checkout_session = stripe.checkout.Session.create(
